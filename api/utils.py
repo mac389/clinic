@@ -1,3 +1,4 @@
+import scipy
 import numpy as np
 import Pycluster as pc
 def princomp(A,numpc=0, scale=True):
@@ -17,6 +18,25 @@ def princomp(A,numpc=0, scale=True):
 		coeff = coeff[:,range(numpc)] # cutting some PCs
 		score = np.dot(coeff.T,M) # projection of the data in the new space
 	return coeff,score,latent
+
+def ecdf(x):
+  # normalize X to sum to 1
+  x = x / np.sum(x)
+  return np.cumsum(x)
+
+def find_nearest(array,value):
+    idx = (np.abs(array-value)).argmin()
+    return array[idx]
+
+def summarize(data,test,label):
+	print '-----------'
+	for test,label in tests:
+		print '%s : %.03f'%(label,test(data))
+	print '-----------'
+
+
+format = lambda text: text.rstrip('\n').strip()
+center = lambda data: (data - data.mean(axis=0))/(data.std(axis=0))
 
 def eigendecomp(A,numpc=0):
 	[latent,coeff] = np.linalg.eig(A)

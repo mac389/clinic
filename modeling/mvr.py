@@ -1,75 +1,132 @@
-import json
+import json,random
 
 import numpy as np
+import api.utils as tech
 
-from pprint import pprint
 from sklearn.linear_model import LogisticRegression
 from sklearn.feature_extraction import DictVectorizer
+from visualization import visualization
+from pprint import pprint
+from scipy.stats import spearmanr
 
-sensitivity = lambda data: data[0,0]/float(data[:,0].sum())
-specificity = lambda data: data[1,1]/float(data[:,1].sum())
 
-ppv = lambda data: data[0,0]/float(data[0,:].sum())
-npv = lambda data: data[1,1]/float(data[1,:].sum())
-
-accuracy = lambda data: data[np.diag_indices_from(data)].sum()/float(data.sum())
-
-tests = zip([sensitivity,specificity,ppv,npv,accuracy],['Sensitivity','Specificity','NPV','PPV','Accuracy'])
-
-def summarize(data):
-	print '-----------'
-	for test,label in tests:
-		print '%s : %.03f'%(label,test(data))
-	print '-----------'
-
-READ = 'rb'
+READ = 'rU'
 WRITE = 'wb'
 TAB = '\t'
-directory = json.load(open('directory.json',READ))
+directory = json.load(open('./data/directory.json',READ))
 
-predictors = json.load(open(directory['mvr']['data'],READ))
-EVD = json.load(open(directory['evd-score'],READ))
+class MVR(object):
 
-extractor = DictVectorizer()
-x = extractor.fit_transform(predictors).toarray()
+	def __init__(self,dataframe):
+		#Error check later, for now assume that this is a data frame
+		self.dataframe = dataframe
 
-model = LogisticRegression()
-model.fit(x,EVD)
+		with open(directory['working-set']['fields'],READ) as f:
+			self.fields = map(tech.format,f.readlines())
+		
+		field_types = json.load(open(directory['field-types'],READ))
 
-predictions = np.array(model.predict(x))
-EVD = np.array(EVD)
-values = np.unique(predictions)
+		#Cast the numerical features from str to int or float
+		self.patients = [{key:value if field_types[tech.format(key)] == 'str' else eval('%s(%s)'%(field_types[tech.format(key)],value)) 
+						for key,value in patient.iteritems()} 
+						for patient in self.dataframe.db]
 
-contingency_table = np.array([[sum((EVD==i)*(predictions==j)) for i in values] for j in values])
+		#Save fully processed array. 
 
-pprint(contingency_table)
-summarize(contingency_table)
+		with open('./data/fully-processed.json',WRITE) as f:
+			json.dump(self.patients,f)
 
-#Evaluate on testing data
-test_predictors = json.load(open(directory['evaluation']['data'],READ))
-test_scores = json.load(open(directory['evaluation']['evd-scores'],READ))
+		directory['fully-processed'] = './data/fully-processed.json'
+
+		#Make covariance matrix to identify variables of interest
+
+		#Split into testing and training
+		#Randomize by shuffling and then splitting in half
+
+		random.shuffle(self.patients) #Make this a parameter so can shuffle many times, store indices
+		self.training = self.patients[:len(self.patients)/2]
+		self.testing = self.patients[len(self.patients)/2:]
+
+		#Extract features
+		self.vec = DictVectorizer()
+		self.x = self.vec.fit_transform(self.patients).toarray()
+
+		covariance,prob = spearmanr(self.x)
+		self.cov_matrix = covariance*(prob<0.05)
+		np.savetxt('./data/covariance-matrix.tsv',self.cov_matrix,fmt='%.04f',delimiter=TAB)
+		directory['covariance'] = {}
+		directory['covariance']['data'] = './data/covariance-matrix.tsv'
+
+		with open('./data/covariance-matrix.fields',WRITE) as f:
+			for item in self.vec.get_feature_names():
+				print>>f,item
+		directory['covariance']['labels'] = './data/covariance-matrix.fields'
+		
+		#visualization.covariance(self.cov_matrix,self.vec.get_feature_names(),show=True,ml=False)
+
+		#Extract the fields that are significantly correlated with at least one of the EVD scores. 
+		self.labels = self.vec.get_feature_names()
+
+		self.idx = np.where(self.cov_matrix[2:5,:]>0)[1]
+		self.good_labels = [self.labels[i] for i in self.idx if 'EVD' not in self.labels[i]]
+		pprint(self.good_labels)
+		
+		with open('../Data/for-mvr.fields',WRITE) as f:
+			for item in self.good_labels:
+				print>>f,item
+
+		with open('../Data/for-mvr.data',WRITE) as f:
+			json.dump([{key:value for key,value in patient.iteritems() if key in self.good_labels} 
+											for patient in self.training], f)
+
+		with open('../Data/evd-scores.data',WRITE) as f:
+			json.dump([patient['EVD score'] for patient in self.training],f)
+
+		with open('../Data/for-mvr-evaluation.data',WRITE) as f:
+			json.dump([{key:value for key,value in patient.iteritems() if key in self.good_labels} 
+											for patient in self.testing], f)
+
+		with open('../Data/evd-scores-evaluation.data',WRITE) as f:
+			json.dump([patient['EVD score'] for patient in self.testing],f)
+		
+
+		#Build logistic model
+
+		self.train_data = json.load(open(directory['mvr']['data'],READ))
+		self.train_outcome = json.load(open(directory['evd-score'],READ))
+
+		self.extractor = DictVectorizer()
+		self.train_data_array = self.extractor.fit_transform(self.train_data).toarray()
+
+		self.model = LogisticRegression()
+		self.model.fit(self.train_data_array,self.train_outcome)
+
+		#Evaluate logistic model
+
+		self.test_data = json.load(open(directory['evaluation']['data'],READ))
+		self.test_outcome = json.load(open(directory['evaluation']['evd-scores'],READ))
+		self.values = range(1,4)
+
+		self.test_predictions = np.array(self.model.predict(self.extractor.transform(self.test_data).toarray())).transpose()
+
+		print zip(self.test_outcome,self.test_predictions)
+
+		#print self.model.decision_function(self.extractor.transform(self.test_data).toarray())
+		#pprint(zip(self.model.coef_.transpose(),self.extractor.get_feature_names()))
+
+		#visualization.mvr_coefficients(self.model,self.extractor.get_feature_names(),show=True)		
+
+		self.test_outcome = np.array(self.test_outcome).astype(int)
+		self.test_predictions = np.array(self.test_predictions).astype(int)
+
+		self.contingency_table = np.array([[sum((self.test_outcome==i)*(self.test_predictions==j)) 
+			for i in self.values] for j in self.values])
+
+		pprint(self.contingency_table)
 
 
-test_predictions = np.array(model.predict(extractor.transform(test_predictors).toarray())).transpose()
-test_contingency_table = np.array([[sum((test_scores==i)*(test_predictions==j)) for i in values] for j in values]).transpose()
-summarize(test_contingency_table)
+		accuracy = lambda data: data[np.diag_indices_from(data)].sum()/float(data.sum())
+		print accuracy(self.contingency_table)
+#tests = zip([sensitivity,specificity,ppv,npv,accuracy],['Sensitivity','Specificity','NPV','PPV','Accuracy'])
 
-print ''
-print ''
-print model.decision_function(extractor.transform(test_predictors).toarray())
-pprint(zip(model.coef_.transpose(),extractor.get_feature_names()))
-
-import Graphics as artist
-import matplotlib.pyplot as plt
-fig = plt.figure()
-ax = fig.add_subplot(111)
-cax = ax.imshow(np.delete(model.coef_.transpose(),2,0),interpolation='nearest',aspect='auto')
-artist.adjust_spines(ax)
-ax.set_yticks(range(len(extractor.get_feature_names())-1))
-ax.set_yticklabels(map(artist.format,[name for name in extractor.get_feature_names() if 'EVD' not in name]))
-ax.set_xticks(range(3))
-ax.set_xticklabels(map(artist.format,range(1,4)))
-ax.set_xlabel(artist.format('Placement grade'))
-plt.colorbar(cax)
-plt.tight_layout()
-plt.show()
+#summarize(contingency_table)
