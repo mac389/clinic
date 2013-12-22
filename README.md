@@ -8,9 +8,14 @@ This repostitory contains tools to make the rigorous analysis of large clinical 
 						  			  HR   BP   RR  etc.
 									 ----------------->
 									|
-						 Patients	|
+	  **Data**			 Patients	|
 									|
 									V
+
+											|||
+											|||
+											\|/
+											 V
 
 HR = Heart rate
 BP = Blood pressure
