@@ -30,6 +30,13 @@ field_types = json.load(open(directory['field-types'],READ))
 patients = [{key:value if field_types[key] == 'str' else eval('%s(%s)'%(field_types[key],value)) 
 			for key,value in patient.iteritems()} for patient in [dict(zip(fields,patient)) for patient in data]]
 
+#Center the ones that were cast to type float. They represent continuous variables
+for patient in patients:
+	for variable in patient:
+		if type(patient[variable]) is float:
+			tmp = patient[variable]
+			patient[variable] = tech.center(tmp)
+
 #Split into testing and training
 #Randomize by shuffling and then splitting in half
 

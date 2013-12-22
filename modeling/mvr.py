@@ -9,7 +9,6 @@ from visualization import visualization
 from pprint import pprint
 from scipy.stats import spearmanr
 
-
 READ = 'rU'
 WRITE = 'wb'
 TAB = '\t'
@@ -17,9 +16,16 @@ directory = json.load(open('./data/directory.json',READ))
 
 class MVR(object):
 
-	def __init__(self,dataframe):
+	def __init__(self,dataframe,suffix='',basedir=''):
+
+		self.basedir = '.' if basedir == '' else basedir
+
+
+		#Alright,alright soup up file handling
+
 		#Error check later, for now assume that this is a data frame
 		self.dataframe = dataframe
+		self.suffix = suffix
 
 		with open(directory['working-set']['fields'],READ) as f:
 			self.fields = map(tech.format,f.readlines())
@@ -33,7 +39,7 @@ class MVR(object):
 
 		#Save fully processed array. 
 
-		with open('./data/fully-processed.json',WRITE) as f:
+		with open('./data/fully-processed-%s.json'%self.suffix,WRITE) as f:
 			json.dump(self.patients,f)
 
 		directory['fully-processed'] = './data/fully-processed.json'
@@ -43,9 +49,14 @@ class MVR(object):
 		#Split into testing and training
 		#Randomize by shuffling and then splitting in half
 
-		random.shuffle(self.patients) #Make this a parameter so can shuffle many times, store indices
-		self.training = self.patients[:len(self.patients)/2]
-		self.testing = self.patients[len(self.patients)/2:]
+		self.idx = range(len(self.patients))
+		random.shuffle(self.idx) 
+		self.training = [self.patients[i] for i in self.idx[:len(self.idx)/2]]
+		self.testing = [self.patients[i] for i in self.idx[len(self.idx)/2:]]
+
+		with open('./data/iteration-%s.indices'%self.suffix,WRITE) as f:
+			print>>f,self.idx
+
 
 		#Extract features
 		self.vec = DictVectorizer()
@@ -69,27 +80,25 @@ class MVR(object):
 
 		self.idx = np.where(self.cov_matrix[2:5,:]>0)[1]
 		self.good_labels = [self.labels[i] for i in self.idx if 'EVD' not in self.labels[i]]
-		pprint(self.good_labels)
-		
-		with open('../Data/for-mvr.fields',WRITE) as f:
+
+		with open('../Data/for-mvr-%s.fields'%(self.suffix),WRITE) as f:
 			for item in self.good_labels:
 				print>>f,item
 
-		with open('../Data/for-mvr.data',WRITE) as f:
+		with open('../Data/for-mvr-%s.data'%(self.suffix),WRITE) as f:
 			json.dump([{key:value for key,value in patient.iteritems() if key in self.good_labels} 
 											for patient in self.training], f)
 
-		with open('../Data/evd-scores.data',WRITE) as f:
+		with open('../Data/evd-scores-%s.data'%(self.suffix),WRITE) as f:
 			json.dump([patient['EVD score'] for patient in self.training],f)
 
-		with open('../Data/for-mvr-evaluation.data',WRITE) as f:
+		with open('../Data/for-mvr-evaluation-%s.data'%(self.suffix),WRITE) as f:
 			json.dump([{key:value for key,value in patient.iteritems() if key in self.good_labels} 
 											for patient in self.testing], f)
 
-		with open('../Data/evd-scores-evaluation.data',WRITE) as f:
+		with open('../Data/evd-scores-evaluation-%s.data'%(self.suffix),WRITE) as f:
 			json.dump([patient['EVD score'] for patient in self.testing],f)
 		
-
 		#Build logistic model
 
 		self.train_data = json.load(open(directory['mvr']['data'],READ))
@@ -109,12 +118,8 @@ class MVR(object):
 
 		self.test_predictions = np.array(self.model.predict(self.extractor.transform(self.test_data).toarray())).transpose()
 
-		print zip(self.test_outcome,self.test_predictions)
-
-		#print self.model.decision_function(self.extractor.transform(self.test_data).toarray())
-		#pprint(zip(self.model.coef_.transpose(),self.extractor.get_feature_names()))
-
-		#visualization.mvr_coefficients(self.model,self.extractor.get_feature_names(),show=True)		
+		visualization.mvr_coefficients(self.model,self.extractor.get_feature_names(),
+			savename='./data/mvr-coefficients-%s.png'%self.suffix)		
 
 		self.test_outcome = np.array(self.test_outcome).astype(int)
 		self.test_predictions = np.array(self.test_predictions).astype(int)
@@ -122,11 +127,8 @@ class MVR(object):
 		self.contingency_table = np.array([[sum((self.test_outcome==i)*(self.test_predictions==j)) 
 			for i in self.values] for j in self.values])
 
-		pprint(self.contingency_table)
-
-
 		accuracy = lambda data: data[np.diag_indices_from(data)].sum()/float(data.sum())
-		print accuracy(self.contingency_table)
-#tests = zip([sensitivity,specificity,ppv,npv,accuracy],['Sensitivity','Specificity','NPV','PPV','Accuracy'])
 
-#summarize(contingency_table)
+		self.evaluation = tuple((self.contingency_table,accuracy(self.contingency_table)))
+		#tests = zip([sensitivity,specificity,ppv,npv,accuracy],['Sensitivity','Specificity','NPV','PPV','Accuracy'])
+

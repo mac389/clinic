@@ -1,17 +1,24 @@
-import json,sys
+import json,sys,cPickle
 
 from api.DataFrame import DataFrame
 from modeling.mvr import MVR
-
+from pprint import pprint
+from time import time
+from datetime import datetime
 #Acquire and format data
 filename = sys.argv[1] #Should make more robust with proper options parsing
 dataframe = DataFrame(filename)
 
+
+timestamp = lambda time: datetime.fromtimestamp(time).strftime('%Y-%m-%d-%H-%M-%S')
+
+iterations = 10000
+results = []
 #Process data (visualize, find import features)
-model = MVR(dataframe)
-#Create model with data (use one group of important features to predict another group)
+for iteration in xrange(iterations):
+	print iteration,'\t',
+	model = MVR(dataframe,dir=timestamp(time()),suffix=str(iteration))
+	results.append(model.evaluation)
+	del model
 
-#Validate that model 
-
-#Output results
-
+cPickle.dump(results,open('results.evaluation','wb'))
