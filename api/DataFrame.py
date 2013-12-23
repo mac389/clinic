@@ -64,7 +64,7 @@ class DataFrame(object):
 
 			'''
 
-			np.savetxt('./data/working-data-set.data',self.data, fmt='%s',delimiter=TAB)
-			with open('./data/working-data-set.fields',WRITE) as f:
+			np.savetxt(directory['working-set']['data'],self.data, fmt='%s',delimiter=TAB)
+			with open(directory['working-set']['fields'],WRITE) as f:
 				for item in self.keys:
 					print>>f,item

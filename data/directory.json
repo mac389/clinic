@@ -1,7 +1,7 @@
 {"data":"../Data/11-13-2013.csv",
 "excluded":"./data/excluded.fields",
 "missing-values":"./data/missing-values.fields",
-"working-set":{"data":"./data/working-data-set.data","fields":"./data/working-data-set.fields"},
+"working-set":{"data":"../Data/working-data-set.data","fields":"../Data/working-data-set.fields"},
 "working-set-pls":{"data":"../Data/working-data-set-pls.data","fields":"../Data/working-data-set-pls.fields"},
 "mvr":{"data":"../Data/for-mvr.data","fields":"../Data/for-mvr.fields"},
 "evd-score":"../Data/evd-scores.data",
