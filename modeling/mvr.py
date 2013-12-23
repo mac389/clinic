@@ -1,4 +1,4 @@
-import json,random,os
+import json,random,os,operator
 
 import numpy as np
 import api.utils as tech
@@ -58,11 +58,7 @@ class MVR(object):
 
 		if not os.path.isfile('./data/covariance-matrix.tsv'):
 
-			covariance = self.cov()
-			'''
-			covariance,prob = spearmanr(self.x)
-			self.cov_matrix = covariance*(prob<0.05)
-			'''
+			self.cov_matrix = self.cov()
 			np.savetxt('./data/covariance-matrix.tsv',self.cov_matrix,fmt='%.04f',delimiter=TAB)
 			directory['covariance'] = {}
 			directory['covariance']['data'] = './data/covariance-matrix.tsv'
@@ -72,7 +68,13 @@ class MVR(object):
 					print>>f,item
 			directory['covariance']['labels'] = './data/covariance-matrix.fields'
 		
-		#visualization.covariance(self.cov_matrix,self.vec.get_feature_names(),show=True,ml=False)
+		else:
+			self.cov_matrix = np.loadtxt('./data/covariance-matrix.tsv',delimiter=TAB)
+		
+
+		if not os.path.isfile('%scovariance-matrix.png'%(self.basedir)):
+			visualization.covariance(self.cov_matrix,self.vec.get_feature_names()
+			,ml=False,savename='%scovariance-matrix'%(self.basedir))
 
 		#Extract the fields that are significantly correlated with at least one of the EVD scores. 
 		self.labels = self.vec.get_feature_names()
@@ -131,17 +133,34 @@ class MVR(object):
 		self.evaluation = tuple((self.contingency_table,accuracy(self.contingency_table)))
 		#tests = zip([sensitivity,specificity,ppv,npv,accuracy],['Sensitivity','Specificity','NPV','PPV','Accuracy'])
 	
+	def get_type(self,idx):
+		full_name = self.vec.get_feature_names()[idx]
+		antecedent = [field_type for field_type in self.field_types if field_type in full_name][0]
+		return self.field_types[antecedent]
+
 	def cov(self):
-		return np.array([[spearmanr(self.x[i,:],self.x[j,:]) 
-						if self.field_types[i] == "float" or self.field_types[j] == "float"
+
+		#Do this more formally later
+		self.convert_types = {idx:self.get_type(idx) for idx in xrange(self.x.shape[1])}
+
+		return np.array([[spearmanr(self.x[:,i],self.x[:,j])[0] 
+						if self.convert_types[i] == "float" or self.convert_types[j] == "float"
 						else self.normalized_odds_ratio(i,j)
-						for i in xrange(self.x.shape[0])] 
-						for j in xrange(self.x.shape[0])])
+						for i in xrange(self.x.shape[1])] 
+						for j in xrange(self.x.shape[1])])
 
 	def normalized_odds_ratio(self,i,j):
 		#Assuming that i and j are row indices
 
 		row_values = np.unique(self.x[i,:])
 		col_values = np.unique(self.x[j,:])
-		
-		return (diag + off_diag)/float(diag-off_diag)
+
+		contingency_table = np.array([[sum((self.x[i,:]==row_val)*(self.x[j,:]==col_val)) 
+			for row_val in row_values] for col_val in col_values])
+
+
+		diag = np.diag(contingency_table).sum()
+		rest = contingency_table.sum()-diag.sum()
+
+		print (diag - rest)/float(diag+rest)
+		return (diag - rest)/float(diag+rest)

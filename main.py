@@ -15,7 +15,7 @@ dataframe = DataFrame(filename)
 
 timestamp = lambda time: datetime.fromtimestamp(time).strftime('%Y-%m-%d-%H-%M-%S')
 
-iterations = 100
+iterations = 10
 results = []
 basedir = '../Data/%s/'%timestamp(time())
 #Process data (visualize, find import features)

@@ -22,7 +22,7 @@
 "length in ventricle": "float", 
 "angle with horizontal": "float", 
 "midline shift": "float",
-"age": "int", 
+"age": "float", 
 "Postion": "str", 
 "burr hole diameter. Ext": "float", 
 "burr hole diameter 2. Int": "float", 
