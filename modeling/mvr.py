@@ -76,6 +76,23 @@ class MVR(object):
 			visualization.covariance(self.cov_matrix,self.vec.get_feature_names()
 			,ml=False,savename='%scovariance-matrix'%(self.basedir))
 
+		if not os.path.isfile('./data/partial-covariance-matrix.tsv'):
+
+			self.partial_cov_matrix = self.partial_cov()
+			np.savetxt('./data/partial-covariance-matrix.tsv',self.partial_cov_matrix,fmt='%.04f',delimiter=TAB)
+
+			with open('%spartial-covariance-matrix.fields'%self.basedir,WRITE) as f:
+				for item in self.vec.get_feature_names():
+					print>>f,item
+		
+		else:
+			self.partial_cov_matrix = np.loadtxt('./data/partial-covariance-matrix.tsv',delimiter=TAB)
+		
+
+		if not os.path.isfile('%spartial-covariance-matrix.png'%(self.basedir)):
+			visualization.covariance(self.partial_cov_matrix,self.vec.get_feature_names()
+			,ml=False,savename='%spartia-covariance-matrix'%(self.basedir))	
+
 		#Extract the fields that are significantly correlated with at least one of the EVD scores. 
 		self.labels = self.vec.get_feature_names()
 
@@ -149,6 +166,13 @@ class MVR(object):
 						for i in xrange(self.x.shape[1])] 
 						for j in xrange(self.x.shape[1])])
 
+	def partial_cov(self):
+		omega = self.cov_matrix
+		p = np.linalg.inv(omega)
+
+		return np.array([[p[i][j]/np.sqrt(p[i][i]*p[j][j]) for i in xrange(p.shape[0])] for j in xrange(p.shape[1])])
+
+
 	def normalized_odds_ratio(self,i,j):
 		#Assuming that i and j are row indices
 
@@ -161,6 +185,4 @@ class MVR(object):
 
 		diag = np.diag(contingency_table).sum()
 		rest = contingency_table.sum()-diag.sum()
-
-		print (diag - rest)/float(diag+rest)
 		return (diag - rest)/float(diag+rest)
