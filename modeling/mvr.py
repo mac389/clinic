@@ -71,6 +71,10 @@ class MVR(object):
 		else:
 			self.cov_matrix = np.loadtxt('./data/covariance-matrix.tsv',delimiter=TAB)
 		
+		if not os.path.isfile('%scorrelation-cutoff'%self.basedir):
+			self.cutoff = visualization.ecdf(self.cov_matrix[2:5,:].ravel(),savename = '%scorrelation-cutoff'%self.basedir)
+
+		#After cleaning up code, use this cutoff.
 
 		if not os.path.isfile('%scovariance-matrix.png'%(self.basedir)):
 			visualization.covariance(self.cov_matrix,self.vec.get_feature_names()
