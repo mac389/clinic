@@ -34,7 +34,7 @@ class DataFrame(object):
 								if key not in self.excluded} 
 								for patient in self.db]
 
-			self.db = filter(lambda patient: patient['Ventriculostomy']=='evd',self.db)
+			#self.db = filter(lambda patient: patient['Ventriculostomy']=='evd',self.db)
 
 			self.db = filter(lambda patient: not any([value in self.missing_values 
 												for value in patient.values()]),self.db)

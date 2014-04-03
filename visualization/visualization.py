@@ -3,10 +3,25 @@ import numpy as np
 import Graphics as artist
 import api.utils as tech
 import statsmodels.api as sm
-
+from scipy.stats import scoreatpercentile
 
 from matplotlib import rcParams
 rcParams['text.usetex'] = True
+
+formatted = {'tumor=1':'Tumor, Yes','tumor=0':'Tumor, No','tumor=':'Tumor, Unknown','total length (stripe length)':'Total Length',
+	'tangent with vertical(angle)':'Tangent with vertical','skull thickness 2':'external hole thickness',
+	'skull thickness 1':'inner hole thickness','sex=M':'male','sex=F':'female','sex=':'gender not known',
+	'resident-year=NA':'Resident year: unknown','resident year=6':'PGY 6','resident year=5':"PGY 5",
+	'resident year=5':'PGY 5','resident year=4':'PGY 4','resident year=3':'PGY 3','resident year=2':'PGY 2',
+	'resident year=1':'PGY 1','midline shift direct=L':'Left shift','midline shift direct=R':'Right shift',
+	'midline shift direct=0':'No midline shift','midline shift=':'Shift direction unknown',
+	'length in brain (LP)':'Length in brain','burr hole diameter. Ext':'External burr hole diameter',
+	'burr hole diameter 2. Int':'Internal burr hole diameter','Ventriculosomy=EVD':'Use of EVD',
+	'Right Caudate to Septum Distance':'Distance from right caudate to septum',
+	'Left Caudate to Septum Distance':'Distance from left caudate to septum',
+	'Line through caudate heads to inner tables':'Distance from caudate to inner table','IVH?=1':'Intraventricular hemorrhage, Yes',
+	'IVH?=0':'Intraventricular hemorrhage, No','IVH?=':'Intraventricular hemorrhage, Unknown'}
+format = lambda text: r'\textbf{%s}'%(formatted[text].capitalize() if text in formatted else text.capitalize())
 
 def covariance(heatmap,labels,show=False,savename=None,ml=False):
 	#Covariance matrix
@@ -81,5 +96,31 @@ def mvr_coefficients(model,labels,show=False,savename=None):
 	plt.tight_layout()
 	if savename:
 		plt.savefig('%s.png'%savename,dpi=200)
+	if show:
+		plt.show()
+
+def coefficients(model,labels,show=False,savename=None,title=None):
+
+	fig = plt.figure(figsize=(8,10))
+	ax = fig.add_subplot(111)
+	x = -model.coef_.transpose()
+	x /= np.absolute(x).max()
+	y = np.arange(len(x))+0.5
+
+	cutoff = scoreatpercentile(np.absolute(x),85)
+	ax.barh(y,x,color=['r' if datum < 0 else 'g' for datum in x])
+	ax.axvline(cutoff,linewidth=2,linestyle='--',color='r')
+	ax.axvline(-cutoff,linewidth=2,linestyle='--',color='r')
+	artist.adjust_spines(ax)
+	ax.grid(True)
+	ax.set_ylim(ymax=62)
+	ax.set_xlim(xmin=-1.1,xmax=1.1)
+	ax.set_yticks(y)
+	ax.set_yticklabels(map(format,labels),y)
+	ax.set_xlabel(format('Regression coefficient'))
+
+	if title:
+		ax.set_title(r'\Large \textbf{%s}'%title)
+	plt.tight_layout()
 	if show:
 		plt.show()

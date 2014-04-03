@@ -5,7 +5,7 @@ from matplotlib import rcParams
 from matplotlib.mlab import psd
 from scipy.stats import scoreatpercentile
 
-import api.utils as tech
+#import api.utils as tech
 
 rcParams['xtick.direction'] = 'in'
 rcParams['ytick.direction'] = 'in'
